@@ -1,0 +1,9 @@
+error_log
+
+/vendor
+/node_modules
+/.env
+/database
+/debug.log
+/debug.*.log
+/debug.*.log.gz
