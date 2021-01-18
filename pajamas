@@ -1,0 +1,462 @@
+#!/usr/bin/env bash
+VM=default
+
+if [[ "$(uname -s)" =~ ^MINGW64_NT-10.0 ]]
+then
+  TO_USE_DOCKER="powershell winpty -- "
+  parse_rounds=3
+else
+  TO_USE_DOCKER="${TO_USE_DOCKER}"
+  parse_rounds=1
+fi
+
+__DIR__="$(dirname "$0")"
+
+if [ ! -f "$__DIR__/.env" ]
+then
+  cp "$__DIR__/.env.example" "$__DIR__/.env"
+fi
+
+\. "$__DIR__/.env"
+
+ensure_dir()
+{
+  if [ ! -d  "$__DIR__/$1"  ]
+  then
+    mkdir "$__DIR__/$1"
+  fi
+}
+
+remote_details()
+{
+  ensure_dir .pajamas/remotes
+
+  ADDRESS="$(cat "$__DIR__/.pajamas/remotes/$1")"
+  RESULT=$?
+
+  if [ $RESULT -eq 0 ]
+  then
+    URL="$(sed -E 's/^(..*)\:.*$/\1/g' <<< "$ADDRESS")"
+    DIR="$(sed -E 's/^..*\:((.*)?)(\/\.git\/?)?$/\1/g' <<< "$ADDRESS")"
+
+    export URL DIR
+  fi
+
+  return $RESULT
+}
+
+setup_remote()
+{
+  if "$0" ssh "$1" echo
+  then
+    "$0" ssh "$1" "git init && git config receive.denyCurrentBranch false"
+
+    "$0" scp "$1" "$__DIR__/.pajamas/post-receive.sh" {}.git/hooks/post-receive
+
+    "$0" ssh "$1" chmod u+x .git/hooks/post-receive
+
+    "$0" deploy "$1"
+
+    "$0" ssh "$1" composer install
+    "$0" ssh "$1" yarn
+    "$0" ssh "$1" yarn run production
+  else
+    echo unknown remote $1
+  fi
+}
+
+parse_container_name()
+{
+  DIR="$(pwd)"
+
+  while [[ "$DIR" != '/' ]]
+  do
+    if [ -f "$DIR/docker-compose.yml" ]
+    then
+      name="$(basename "$DIR" | sed -E s/[\ \.]//g)"
+
+      export container_name="${name,,}""_$1_1"
+
+      if docker exec $container_name echo > /dev/null 2>&1
+      then
+        return 0
+      fi
+
+      return 1
+    fi
+
+    DIR="$(dirname "$DIR")"
+  done
+
+  return 1
+}
+
+ensure_dir .pajamas
+
+command="$1"
+shift 1
+case "$command" in
+  # Docker Commands
+
+  stop|down)
+    if [[  $(docker ps -q ) ]]
+    then
+      docker stop $(docker ps -q ) >> /dev/null
+    fi
+
+    if [[  $(docker ps -q -a ) ]]
+    then
+      docker rm $(docker ps -q -a ) >> /dev/null
+    fi
+  ;;
+
+  init|up)
+    "$0" stop
+
+    docker-compose.exe up -d
+  ;;
+
+  watch)
+    "$0" stop
+
+    exec $TO_USE_DOCKER docker-compose.exe up
+  ;;
+
+  restart)
+    "$0" init
+  ;;
+
+  exec)
+    if parse_container_name "$1"
+    then
+      shift 1
+      options=""
+
+      if [ -t 0 ]
+      then
+        options="-i"
+      fi
+
+      args="$@"
+
+      if (( $# < 1 ))
+      then
+        args="bash --login $options"
+      fi
+
+      echo $TO_USE_DOCKER docker exec $options -t "$container_name" $args >&2
+      exec $TO_USE_DOCKER docker exec $options -t "$container_name" $args
+
+      exit $?
+    else
+      echo "couldn't find container"
+    fi
+  ;;
+
+  logs|top)
+    if parse_container_name "$1"
+    then
+      shift 1
+
+      echo $TO_USE_DOCKER docker $command "$container_name" $@ >&2
+      exec $TO_USE_DOCKER docker $command "$container_name" $@
+
+      exit 0
+    else
+      echo "couldn't find container"
+    fi
+  ;;
+
+
+  ## Short cuts
+
+  com|composer)
+    exec "$0" exec web composer $@
+  ;;
+
+  wp|wordpress|wp-cli)
+    exec "$0" exec web vendor/bin/wp $@
+  ;;
+
+  sql|mysql)
+    if [ "${DB_HOST}" == "127.0.0.1" ]
+    then
+      if parse_container_name "web"
+      then
+        options=""
+
+        if [ -t 0 ]
+        then
+          options="-it"
+        fi
+
+        args=""
+        echo $@
+
+        while (( $# > 0 ))
+        do
+          arg="$1"
+
+          for (( i = 0; i < parse_rounds; i ++))
+          do
+            echo "$arg"
+            arg="$(printf %q "$arg")"
+          done
+
+          args="$args $arg"
+          shift 1
+        done
+
+        echo $TO_USE_DOCKER docker exec -e MYSQL_PWD="${DB_PASSWORD}" $options "$container_name" mysql -u "${DB_USER}" $args "$DB_NAME" >&2
+        exec $TO_USE_DOCKER docker exec -e MYSQL_PWD="${DB_PASSWORD}" $options "$container_name" mysql -u "${DB_USER}" $args "$DB_NAME"
+      else
+        echo container not found
+      fi
+    else
+      MYSQL_PWD="${DB_PASSWORD}" exec mysql -u "${DB_USER}" -h"${DB_HOST}" "$DB_NAME" $@
+    fi
+  ;;
+
+  sqldump|mysqldump)
+    if [ "${DB_HOST}" == "127.0.0.1" ]
+    then
+      if parse_container_name "web"
+      then
+        exec $TO_USE_DOCKER docker exec -e MYSQL_PWD="${DB_PASSWORD}" -it "$container_name" mysqldump -u "${DB_USER}" "$DB_NAME" $@
+      fi
+    else
+      MYSQL_PWD="${DB_PASSWORD}" exec mysqldump -u "${DB_USER}" -h"${DB_HOST}" "$DB_NAME" $@
+    fi
+  ;;
+
+  # Remote Commands
+
+  remote)
+    ensure_dir .pajamas/remotes
+
+    subcommand="$1"
+    shift 1
+
+    case "$subcommand" in
+      add)
+        if [ -f "$__DIR__/.pajamas/remotes/$1"  ]
+        then
+          echo remote $1 already exists
+          exit 1
+        fi
+
+        echo "$2" > "$__DIR__/.pajamas/remotes/$1"
+      ;;
+
+      set-url)
+        if [ ! -f "$__DIR__/.pajamas/remotes/$1"  ]
+        then
+          echo remote $1 doesn\'t exists
+          exit 1
+        fi
+
+        echo "$2" > "$__DIR__/.pajamas/remotes/$1"
+      ;;
+
+      rm)
+        if [ ! -f "$__DIR__/.pajamas/remotes/$1"  ]
+        then
+          echo remote $1 doesn\'t exists
+          exit 1
+        fi
+
+        rm "$__DIR__/.pajamas/remotes/$1"
+      ;;
+
+      list)
+        while read file null
+        do
+         echo $(basename "$file") "$(cat "$file")"
+        done <<< "$(find "$__DIR__/.pajamas/remotes/$1" -type f)"
+      ;;
+
+    esac
+  ;;
+
+  deploy)
+    if remote_details "$1"
+    then
+      current_branch="$(git rev-parse --abbrev-ref HEAD)"
+      branch="${2-$current_branch}"
+
+      if [ "$1" == "production" ] && [ "$branch" != "master" ]
+      then
+        echo "Can't Deploy non master branch to production"
+        exit 1
+      fi
+
+      echo "Push $branch -> $1"
+      read -p "Are you Sure? If so type AFFIRMATIVE: " -r REPLY < /dev/tty
+
+      if [ "$REPLY" != 'AFFIRMATIVE' ]
+      then
+        echo "[Cancelled]"
+        exit 1
+      fi
+
+
+
+      echo git push "${URL}:${DIR}/.git" "$branch:master"
+      git push "${URL}:${DIR}/.git" "$branch:master"
+    else
+      echo unknown remote $1
+    fi
+  ;;
+
+  setup)
+    if remote_details "$1"
+    then
+      setup_remote "$1"
+    else
+      echo unknown remote $1
+    fi
+  ;;
+
+  ssh)
+    if remote_details "$1"
+    then
+      shift 1
+
+      if (( $# > 0 ))
+      then
+        echo ssh -t "${URL}" "cd \"${DIR}\"; exec $@" >&2
+        exec ssh -t "${URL}" "cd \"${DIR}\"; exec $@"
+      else
+        echo ssh -t "${URL}" "cd \"${DIR}\"; exec \$SHELL -l" >&2
+        exec ssh -t "${URL}" "cd \"${DIR}\"; exec \$SHELL -l"
+      fi
+    else
+      echo unknown remote $1
+    fi
+  ;;
+
+  scp)
+    if remote_details "$1"
+    then
+      shift 1
+
+      args="${@//\{\}\//${URL}:}"
+      args="${args//\{\}/${URL}:${DIR}/}"
+
+      echo scp $args >&2
+      exec scp $args
+    else
+      echo unknown remote $1
+    fi
+  ;;
+
+  # delete-database)
+  #   "$0" mysql --execute="SHOW TABLES"
+  # ;;
+
+  # push-database)
+  #   remote="$1"
+
+  #   echo "Push local database -> $1"
+  #   read -p "Are you Sure? If so type AFFIRMATIVE: " -r REPLY < /dev/tty
+
+  #   if [ "$REPLY" != 'AFFIRMATIVE' ]
+  #   then
+  #     echo "[Cancelled]"
+  #     exit 1
+  #   fi
+
+  #   remote_path="$__DIR__/database/root/$(date +%Y-%m-%D)-$remote.sql"
+  #   local_path="$__DIR__/database/root/$(date +%Y-%m-%D).sql"
+
+  #   "$0" ssh "$remote" ./pajamas mysqldump > "$remote_path"
+  #   "$0" mysqldump > "$local_path"
+
+  #   "$0" ssh "$remote" ./pajamas mysql < "$local_path"
+  # ;;
+
+  # pull-database)
+  #   remote="$1"
+
+  #   echo "Push remote $1 database -> local"
+  #   read -p "Are you Sure? If so type AFFIRMATIVE: " -r REPLY < /dev/tty
+
+  #   if [ "$REPLY" != 'AFFIRMATIVE' ]
+  #   then
+  #     echo "[Cancelled]"
+  #     exit 1
+  #   fi
+
+  #   remote_path="$__DIR__/database/root/$(date +%Y-%m-%D)-$remote.sql"
+  #   local_path="$__DIR__/database/root/$(date +%Y-%m-%D).sql"
+
+  #   "$0" ssh "$remote" ./pajamas mysqldump > "$remote_path"
+  #   "$0" mysqldump > "$local_path"
+
+  #   "$0" mysql < "$remote_path"
+  # ;;
+
+  push-uploads)
+    if remote_details "$1"
+    then
+      exec "$0" scp "$1" -r public/content/uploads {}public/content/
+    else
+      echo unknown remote $1
+    fi
+  ;;
+
+  pull-uploads)
+    if remote_details "$1"
+    then
+      exec "$0" scp "$1" -r {}public/content/uploads public/content/
+    else
+      echo unknown remote $1
+    fi
+  ;;
+
+  # General
+
+  help)
+    printf "Avaliable Commands:\n"
+
+    printf "  Docker Env Commands:\n\n"
+    printf "    stop: Shutdown Env \n\n"
+    printf "    init: Start Env\n\n"
+    printf "    watch: Start and view logs live\n\n"
+    printf "    restart: Restart Env\n\n"
+    printf "    exec: Execute Command on container\n\n"
+    printf "      ./pajamas exec [web|database] [command]\n"
+    printf "      if no command is specified bash is started\n"
+
+    printf "    logs: Show Logs on container\n\n"
+    printf "    top: Show Processes on container\n\n"
+
+    printf "    com|composer: run composer on web container \n     ./pajamas exec web composer\n\n"
+    printf "    sql|mysql: run mysql on database container will open console if no stdin specified \n\n"
+    printf "    sqldump|mysqldump: dump database to console  \n\n"
+
+    printf "  Remote Env Commands:\n"
+
+    printf "    remote: manage remote locations\n"
+    printf "      list: list all remote locations\n       ./pajamas remote list \n\n"
+    printf "      add: add remote location\n       ./pajamas remote add staging username@server-ip-address:path-to-env \n\n"
+    printf "      set-url: update remote location\n       ./pajamas remote set-url staging username@server-ip-address:path-to-env \n\n"
+    printf "      rm: remove remote location \n       ./pajamas remote rm staging \n\n"
+
+    printf "    deploy: push branch to remote location, defaults to current branch \n     ./pajamas deploy staging [branch] \n\n"
+    printf "    sqldump|mysqldump: dump database to console  \n\n"
+    printf "    ssh: Execute Command on remote env\n\n"
+    printf "      ./pajamas ssh staging [command]\n\n"
+    printf "      if no command is specified bash is started\n\n"
+    printf "    scp: Move file between local and remote env\n\n"
+    printf "      ./pajamas scp staging ./local-path {}remote-path\n\n"
+    printf "      {} is the placeholder for the remote location\n\n"
+    printf "  help: display this message\n\n"
+  ;;
+
+  *)
+    echo "Unknown command"
+    echo
+    "$0" help
+  ;;
+esac

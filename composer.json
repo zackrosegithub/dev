@@ -1,0 +1,82 @@
+{
+  "name": "staxoweb/wordpress-template",
+  "description": "",
+  "keywords": [
+    "wordpress",
+    "blog",
+    "cms"
+  ],
+  "repositories":[
+    {
+      "type": "composer",
+      "url": "https://wp-languages.github.io"
+    },
+    {
+      "type":"composer",
+      "url":"https://wpackagist.org"
+    },
+    {
+      "type": "composer",
+      "url": "https://premium.wpmudev.org/"
+    },
+    {
+      "type": "package",
+      "package": {
+        "name": "advanced-custom-fields/advanced-custom-fields-pro",
+        "version": "5.9.1",
+        "type": "wordpress-plugin",
+        "dist": {
+          "type": "zip",
+          "url": "https://connect.advancedcustomfields.com/index.php?p=pro&a=download"
+        },
+        "require": {
+          "philippbaschke/acf-pro-installer": "^1.0",
+          "composer/installers": "^1.0"
+        }
+      }
+    }
+  ],
+  "type": "project",
+  "homepage": "https://staxoweb.com/",
+  "license": "GPL-2.0+",
+  "authors": [
+    {
+      "name": "David L.J Goring",
+      "homepage": "https://github.com/dgoring/"
+    }
+  ],
+  "extra": {
+    "wordpress-install-dir": "public/wp",
+    "installer-paths": {
+      "public/content/mu-plugins/{$name}/": ["type:wordpress-muplugin"],
+      "public/content/plugins/{$name}/": ["type:wordpress-plugin"],
+      "public/content/themes/{$name}/": ["type:wordpress-theme"]
+    },
+    "dropin-paths": {
+      "public/content/languages/": ["vendor:koodimonni-language"],
+      "public/content/languages/plugins/": ["vendor:koodimonni-plugin-language"],
+      "public/content/languages/themes/": ["vendor:koodimonni-theme-language"]
+    }
+  },
+  "require": {
+    "php": ">=7.4",
+    "roots/wordpress": "^5.5.1",
+    "roots/wp-config": "^1.0",
+    "roots/wp-password-bcrypt": "1.0.0",
+    "oscarotero/env": "^1.2",
+    "vlucas/phpdotenv": "^2",
+    "advanced-custom-fields/advanced-custom-fields-pro": "^5.9.1",
+    "wpmudev/wpmu-dev-dashboard": "^4.10",
+    "wpmudev/wp-smush-pro": "^3.7",
+    "wpackagist-plugin/contact-form-7": "^5.0.5",
+    "wpackagist-plugin/wordpress-seo": "^15.0",
+    "wpackagist-plugin/wordfence": "^7.0",
+    "wpackagist-plugin/rollbar": "^2.6",
+    "wpackagist-plugin/wp-fastest-cache": "^0.9",
+    "wpackagist-plugin/classic-editor": "^1.5",
+    "koodimonni-language/en_gb": "*",
+    "wp-cli/wp-cli-bundle": "^2.4",
+    "wpackagist-plugin/ajax-load-more":"5.4.1",
+    "wpackagist-plugin/post-grid":"2.0.73"
+  }
+}

@@ -1,0 +1,33 @@
+version: '3.7'
+services:
+  web:
+    image: dgoring/php-stack:7.4-nginx
+    volumes:
+      - mysql:/var/lib/mysql
+      - .:/site:cached
+      - ./docker:/config:cached
+      - home:/var/www
+    ports:
+      - ${SITE_PORT_MAP}:443
+      # - 3306:3306
+    environment:
+      MYSQL_DATABASE: "${DB_NAME}"
+      MYSQL_USER: "${DB_USER}"
+      MYSQL_PASSWORD: "${DB_PASSWORD}"
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - 81:80
+    links:
+        - web
+    environment:
+      PMA_HOST: web
+      PMA_USER: "${DB_USER}"
+      PMA_PASSWORD: "${DB_PASSWORD}"
+
+volumes:
+  mysql:
+    driver: "local"
+  home:
+    driver: "local"
+    name: web_home

@@ -1,0 +1,131 @@
+.service-block {
+
+  p {
+
+    @include media-breakpoint-down(sm) {
+      margin-right: 1rem;
+      font-size: 14.4px;
+    }
+
+    @include media-breakpoint-up(md) {
+      font-size: 18px;
+    }
+
+    color: black;
+    text-align: center;
+    @include media-breakpoint-down(md) {
+      text-align: left;
+    }
+
+
+  }
+
+  h4 {
+    color: black;
+    text-align: left;
+    @include media-breakpoint-down(md) {
+      margin-right: auto;
+    }
+    @include media-breakpoint-up(md) {
+      font-size: 22.5px;
+      margin-top: 1rem;
+      margin-bottom: 1rem;
+    }
+  }
+
+
+  @media only screen and (min-width: 1200px) {
+    .container.service-container {
+      max-width: 1304px;
+      padding-top: 80px;
+      padding-bottom: 80px;
+    }
+  }
+
+  .third {
+    padding-left: 27px;
+
+    @include media-breakpoint-down(md) {
+      order: 4;
+    }
+
+    p {
+      @include media-breakpoint-up(lg) {
+        margin: auto;
+      }
+    }
+      margin-bottom: 1rem;
+  }
+
+  .fourth {
+    padding-left: 25px;
+    p {
+      @include media-breakpoint-up(lg) {
+        margin: auto;
+      }
+      margin-bottom: 1rem;
+    }
+  }
+
+  .content-col {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+
+    @include media-breakpoint-down(md) {
+      order: 3;
+    }
+  }
+
+  .second-col {
+    @include media-breakpoint-down(md) {
+      order: 2;
+    }
+  }
+
+  .service-title {
+    background: -webkit-linear-gradient(225deg,rgb(55, 66, 250),rgb(106, 32, 201));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: #2029C9;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+  }
+
+  .service-button, .second-service-button {
+    background: linear-gradient(225deg,rgb(55, 66, 250),rgb(106, 32, 201));
+    border-radius: 25px;
+    padding: 12px 32px;
+  }
+
+  .second-service-button {
+    width: 100%;
+  }
+
+  .service-button-text {
+    color: white;
+  }
+
+  p.one.service {
+    color: black;
+    margin-bottom: 1.5rem;
+    text-align: center;
+
+    &.first {
+      text-align: left;
+    }
+  }
+
+  .service-black {
+    color: black;
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+
+  img.main-image {
+    height: 75%;
+    width: 100%;
+    object-fit: cover;
+  }
+}
+

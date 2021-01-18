@@ -1,0 +1,29 @@
+.row.map-block {
+  background: white;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.container.map-block {
+  padding-top: 80px;
+  padding-bottom: 80px;
+
+  p {
+    .text-dark {
+      width: 100%;
+    }
+  }
+
+}
+
+#map {
+  margin: auto;
+}
+
+@media (max-width: 991.98px) {
+  #map {
+      width: unset !important;
+      max-width: 290px !important;
+      display: none;
+  }
+}

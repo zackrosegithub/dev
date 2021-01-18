@@ -1,0 +1,59 @@
+.row.contact-hero {
+  margin-top: 130px;
+  margin-bottom: 80px;
+  margin-right: 0;
+  margin-left: 0;
+
+  .background-image {
+    object-fit: cover;
+    position: absolute;
+    z-index: -2;
+    height: 100%;
+    width: 100%;
+    left: 0;
+  }
+
+  .foreground-image {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+  }
+
+  .container-fluid {
+    position: absolute;
+        z-index: -1;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+  }
+
+  .overlay {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(225deg, #3742fa, #6a20c9 70.71%);
+    opacity: 0.9;
+  }
+
+  .contact-us {
+    padding-bottom: 2rem;
+  }
+
+  .content-side {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+
+}
+
+@media (min-width: 1200px) {
+  .container.contact-container {
+      max-width: 1293px;
+  }
+}
